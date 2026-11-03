@@ -7,43 +7,59 @@ Semua template digenerate mengikuti pola yang didokumentasikan di [webcore-docs]
 ## Instalasi
 
 ```bash
-go install github.com/webcore-go/webcore-cli@latest
+go install github.com/nersus15/webcore-cli@latest
 ```
 
-Menghasilkan binary bernama `webcore-cli` (rename/alias ke `webcore` sesuai selera, mis. `alias webcore=webcore-cli`).
+Menghasilkan binary bernama `webcore-cli`.
+
+## Shell Completion
+
+CLI ini dibangun dengan [Cobra](https://github.com/spf13/cobra), jadi completion tab seperti git/kubectl sudah otomatis tersedia — termasuk completion **dinamis**: `--module=<TAB>` menyarankan nama modul yang sungguh ada di `modules/` project saat ini, bukan daftar statis.
+
+```bash
+# bash (taruh di ~/.bashrc)
+source <(webcore-cli completion bash)
+
+# zsh (taruh di ~/.zshrc)
+source <(webcore-cli completion zsh)
+```
+
+Shell lain: `webcore-cli completion --help`.
 
 ## Perintah
 
-Jalankan `webcore-cli help` untuk daftar lengkap. Ringkasan:
+Jalankan `webcore-cli --help` untuk daftar lengkap. Ringkasan:
 
 | Perintah | Fungsi |
 | --- | --- |
 | `new <nama-project>` | Project baru lengkap (go.mod, main.go, config.yaml, deps/) |
-| `make:module <Nama>` | Modul lengkap: module.go + config/entity/repository/service/handler |
-| `make:config <Nama>` | `ConfigObject` satu-file (`SetDefaults`/`SetEnvBindings`) |
-| `make:entity <Nama>` | Struct entity + Input |
-| `make:repository <Nama>` | Repository di atas `port.IDatabase` |
-| `make:service <Nama>` | Service layer |
-| `make:handler <Nama>` | Fiber handler (list/get/create) |
-| `make:helper <Nama>` | Package helper mandiri |
-| `make:library <Nama>` | Skeleton library kustom (`port.Library`/`Connector`/`LibraryLoader`) |
-| `make:migration <nama>` | File migrasi goose (`NNNNN_nama.sql`, auto-increment) |
+| `make module <Nama>` | Modul lengkap: module.go + config/entity/repository/service/handler |
+| `make config <Nama>` | `ConfigObject` satu-file (`SetDefaults`/`SetEnvBindings`) |
+| `make entity <Nama>` | Struct entity + Input |
+| `make repository <Nama>` | Repository di atas `port.IDatabase` |
+| `make service <Nama>` | Service layer |
+| `make handler <Nama>` | Fiber handler (list/get/create) |
+| `make helper <Nama>` | Package helper mandiri |
+| `make library <Nama>` | Skeleton library kustom (`port.Library`/`Connector`/`LibraryLoader`) |
+| `make migration <nama>` | File migrasi goose (`NNNNN_nama.sql`, auto-increment) |
 
-Semua `make:*` (kecuali `new`) membaca module path dari `go.mod` di direktori kerja saat ini — jalankan dari root project.
+Semua subcommand `make` (kecuali `new`) membaca module path dari `go.mod` di direktori kerja saat ini — jalankan dari root project.
+
+> Subcommand `make` sengaja pakai spasi (`make module`), bukan titik dua (`make:module`) — titik dua ada di `COMP_WORDBREAKS` default bash, dan akan membuat completion tab tidak ter-insert dengan benar.
 
 ### Dua mode penempatan
 
-`make:config`/`make:entity`/`make:repository`/`make:service`/`make:handler` bisa diarahkan ke dua tempat:
+`make config`/`make entity`/`make repository`/`make service`/`make handler` bisa diarahkan ke dua tempat:
 
 - **Tanpa `--module`** → rata di root project (`entity/`, `repository/`, dst.) — pola ["tanpa modul"](https://github.com/webcore-go/webcore) untuk app kecil/prototipe.
-- **Dengan `--module=<nama>`** → masuk ke `modules/<nama>/<kind>/` milik modul yang sudah ada — mis. menambah entity kedua ke modul yang sudah dibuat `make:module`.
+- **Dengan `--module=<nama>`** → masuk ke `modules/<nama>/<kind>/` milik modul yang sudah ada — mis. menambah entity kedua ke modul yang sudah dibuat `make module`.
 
 Flag boleh diletakkan sebelum atau sesudah argumen nama:
 
 ```bash
-webcore-cli make:module Orders
-webcore-cli make:entity OrderItem --module=orders
-webcore-cli make:entity OrderItem --module=orders --force   # timpa kalau sudah ada
+webcore-cli make module Orders
+webcore-cli make entity OrderItem --module=orders
+webcore-cli make entity OrderItem --module=orders --force   # timpa kalau sudah ada
 ```
 
 ## Contoh Alur Penuh
@@ -52,12 +68,12 @@ webcore-cli make:entity OrderItem --module=orders --force   # timpa kalau sudah 
 webcore-cli new my-api
 cd my-api
 
-webcore-cli make:module orders          # modul lengkap pertama
+webcore-cli make module orders          # modul lengkap pertama
 # daftarkan manual di deps/packages.go (CLI mencetak snippet-nya)
 
-webcore-cli make:entity OrderItem --module=orders   # entity kedua di modul yang sama
-webcore-cli make:migration create_orders_table --module=orders
-webcore-cli make:library mailer                      # library kustom
+webcore-cli make entity OrderItem --module=orders   # entity kedua di modul yang sama
+webcore-cli make migration create_orders_table --module=orders
+webcore-cli make library mailer                      # library kustom
 
 go run main.go
 ```
