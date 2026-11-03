@@ -1,4 +1,4 @@
-module github.com/nersus15/webcore-cli
+module github.com/nersus15/webcore-go-cli
 
 go 1.25.0
 

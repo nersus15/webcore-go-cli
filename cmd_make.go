@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/nersus15/webcore-cli/internal/gomod"
-	"github.com/nersus15/webcore-cli/internal/scaffold"
+	"github.com/nersus15/webcore-go-cli/internal/gomod"
+	"github.com/nersus15/webcore-go-cli/internal/scaffold"
 )
 
 // makeCmd adalah parent "make" — sengaja noun terpisah spasi (make module,

@@ -1,4 +1,4 @@
-# webcore-cli
+# webcore-go-cli
 
 CLI scaffolding untuk framework [WebCore](https://github.com/webcore-go/webcore) — peran yang dimainkannya setara `php artisan` di Laravel: membuat project baru dan menggenerate boilerplate (modul, config, entity, repository, service, handler, helper, library, migration) supaya tidak ditulis tangan berulang-ulang.
 
@@ -7,10 +7,10 @@ Semua template digenerate mengikuti pola yang didokumentasikan di [webcore-docs]
 ## Instalasi
 
 ```bash
-go install github.com/nersus15/webcore-cli@latest
+go install github.com/nersus15/webcore-go-cli@latest
 ```
 
-Menghasilkan binary bernama `webcore-cli`.
+Menghasilkan binary bernama `webcore-go-cli`.
 
 ## Shell Completion
 
@@ -18,17 +18,17 @@ CLI ini dibangun dengan [Cobra](https://github.com/spf13/cobra), jadi completion
 
 ```bash
 # bash (taruh di ~/.bashrc)
-source <(webcore-cli completion bash)
+source <(webcore-go-cli completion bash)
 
 # zsh (taruh di ~/.zshrc)
-source <(webcore-cli completion zsh)
+source <(webcore-go-cli completion zsh)
 ```
 
-Shell lain: `webcore-cli completion --help`.
+Shell lain: `webcore-go-cli completion --help`.
 
 ## Perintah
 
-Jalankan `webcore-cli --help` untuk daftar lengkap. Ringkasan:
+Jalankan `webcore-go-cli --help` untuk daftar lengkap. Ringkasan:
 
 | Perintah | Fungsi |
 | --- | --- |
@@ -57,23 +57,23 @@ Semua subcommand `make` (kecuali `new`) membaca module path dari `go.mod` di dir
 Flag boleh diletakkan sebelum atau sesudah argumen nama:
 
 ```bash
-webcore-cli make module Orders
-webcore-cli make entity OrderItem --module=orders
-webcore-cli make entity OrderItem --module=orders --force   # timpa kalau sudah ada
+webcore-go-cli make module Orders
+webcore-go-cli make entity OrderItem --module=orders
+webcore-go-cli make entity OrderItem --module=orders --force   # timpa kalau sudah ada
 ```
 
 ## Contoh Alur Penuh
 
 ```bash
-webcore-cli new my-api
+webcore-go-cli new my-api
 cd my-api
 
-webcore-cli make module orders          # modul lengkap pertama
+webcore-go-cli make module orders          # modul lengkap pertama
 # daftarkan manual di deps/packages.go (CLI mencetak snippet-nya)
 
-webcore-cli make entity OrderItem --module=orders   # entity kedua di modul yang sama
-webcore-cli make migration create_orders_table --module=orders
-webcore-cli make library mailer                      # library kustom
+webcore-go-cli make entity OrderItem --module=orders   # entity kedua di modul yang sama
+webcore-go-cli make migration create_orders_table --module=orders
+webcore-go-cli make library mailer                      # library kustom
 
 go run main.go
 ```

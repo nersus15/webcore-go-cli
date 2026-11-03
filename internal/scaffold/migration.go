@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nersus15/webcore-cli/internal/names"
+	"github.com/nersus15/webcore-go-cli/internal/names"
 )
 
 var migrationSeqRe = regexp.MustCompile(`^(\d{5})_`)

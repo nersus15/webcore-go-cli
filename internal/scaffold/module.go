@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/nersus15/webcore-cli/internal/names"
+	"github.com/nersus15/webcore-go-cli/internal/names"
 )
 
 // ModuleData adalah variabel yang tersedia di semua template modul.

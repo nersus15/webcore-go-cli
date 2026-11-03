@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/nersus15/webcore-cli/internal/scaffold"
+	"github.com/nersus15/webcore-go-cli/internal/scaffold"
 )
 
 func newCmd() *cobra.Command {

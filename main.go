@@ -1,4 +1,4 @@
-// Command webcore-cli adalah CLI scaffolding untuk framework WebCore
+// Command webcore-go-cli adalah CLI scaffolding untuk framework WebCore
 // (github.com/webcore-go/webcore) — mirip peran `php artisan` di Laravel.
 package main
 
@@ -16,7 +16,7 @@ func main() {
 	// argumen) disilent per-RunE lewat cmd.SilenceUsage = true, lihat
 	// cmd_new.go/cmd_make.go.
 	rootCmd := &cobra.Command{
-		Use:   "webcore-cli",
+		Use:   "webcore-go-cli",
 		Short: "CLI scaffolding untuk framework WebCore",
 	}
 
