@@ -18,10 +18,10 @@ CLI ini dibangun dengan [Cobra](https://github.com/spf13/cobra), jadi completion
 
 ```bash
 # bash (taruh di ~/.bashrc)
-source <(webcore-go-cli completion bash)
+command -v webcore-go-cli >/dev/null 2>&1 && source <(webcore-go-cli completion bash)
 
 # zsh (taruh di ~/.zshrc)
-source <(webcore-go-cli completion zsh)
+command -v webcore-go-cli >/dev/null 2>&1 && source <(webcore-go-cli completion zsh)
 ```
 
 Shell lain: `webcore-go-cli completion --help`.
