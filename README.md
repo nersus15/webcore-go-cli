@@ -32,7 +32,7 @@ Jalankan `webcore-go-cli --help` untuk daftar lengkap. Ringkasan:
 
 | Perintah | Fungsi |
 | --- | --- |
-| `new <nama-project>` | Project baru — `--module=<nama>` utk modul default, kosongkan utk struktur "tanpa modul" |
+| `new <nama-project>` | Project baru — `--module=<nama>` utk workspace go.work + modul default berdiri sendiri, kosongkan utk struktur "tanpa modul" (satu go.mod) |
 | `make module <Nama>` | Modul lengkap: module.go + config/entity/repository/service/handler |
 | `make config <Nama>` | `ConfigObject` satu-file (`SetDefaults`/`SetEnvBindings`) |
 | `make entity <Nama>` | Struct entity + Input |
@@ -54,18 +54,41 @@ Semua subcommand `make` (kecuali `new`) membaca module path dari `go.mod` projec
 
 `new` punya DUA flag yang gampang tertukar — sengaja dipisah namanya biar tidak ambigu:
 
-- **`--module-path=<path>`** — module path Go, baris `module` di `go.mod` (default: nama project sendiri, lokal tanpa domain).
-- **`--module=<nama>`** — nama modul **bisnis** default yang mau dibuat sekaligus. Kosongkan untuk struktur ["tanpa modul"](https://github.com/webcore-go/webcore) (lihat Quick Start webcore-docs § Alternatif Tanpa Modul): cuma `main.go` + `go.mod` + `config.yaml`, tidak ada `deps/` atau `modules/` sama sekali.
+- **`--module-path=<path>`** — module path Go dasar (default: nama project sendiri, lokal tanpa domain).
+- **`--module=<nama>`** — nama modul **bisnis** default yang mau dibuat sekaligus.
 
 ```bash
-# tanpa modul — main.go pakai core.NewApp(ctx, cfg, libraries, nil)
+# tanpa modul — satu go.mod di root, main.go pakai core.NewApp(ctx, cfg, libraries, nil)
 webcore-go-cli new my-api
+```
 
-# dengan satu modul default "orders" — modules/orders/ + deps/orders/{libraries,packages}.go
+```bash
+# dengan satu modul default "orders" — workspace go.work penuh
 webcore-go-cli new my-api --module=orders
 ```
 
-Begitu `--module` diisi, `deps/<nama>/libraries.go` dan `deps/<nama>/packages.go` dinestkan di bawah folder `<nama>` (BUKAN flat di `deps/libraries.go`) — supaya kalau nanti nambah modul lagi lewat `make module <nama2> --deps-dir=deps`, polanya sudah konsisten dari awal.
+**Kosongkan `--module`** → struktur ["tanpa modul"](https://github.com/webcore-go/webcore) (lihat Quick Start webcore-docs § Alternatif Tanpa Modul): satu `go.mod` di root, cuma `main.go` + `config.yaml`, tidak ada `deps/`/`modules/`/`go.work` sama sekali.
+
+**Isi `--module=<nama>`** → dibangun WORKSPACE `go.work` penuh langsung dari awal (bukan dinestkan di bawah satu go.mod) — struktur yang sama seperti project yang sudah "naik kelas" ke multi-modul (lihat [workspace.md](https://github.com/webcore-go/webcore-docs) § Proyek Multi-Modul & Multi-Service):
+
+```
+my-api/
+├── go.work                     # use (./deps ./modules/orders)
+├── config.yaml / access.yaml   # SEJAJAR go.work, bukan bagian go.mod manapun
+├── .env-orders / air-orders.toml
+├── deps/                       # COMPOSITION ROOT, go.mod sendiri
+│   ├── go.mod
+│   ├── main.go                 #   dispatch "switch service" — siap ditambah modul lain
+│   └── orders/
+│       ├── libraries.go
+│       └── packages.go
+└── modules/
+    └── orders/                 # MODUL BISNIS, go.mod sendiri
+        ├── go.mod
+        └── ... (module.go, config/entity/repository/service/handler)
+```
+
+Tidak ada `go.mod`/`main.go` di root — root hanya `go.work` + file yang sejajar dengannya (`config.yaml`, `access.yaml`, `.env-orders`, `air-orders.toml`). Karena `deps/` dan `modules/orders/` sudah masing-masing punya `go.mod` sendiri sejak awal, begitu butuh modul kedua langsung pakai `make module <nama2> --module-path=... --deps-dir=deps` (dan `remove module <nama> --deps-dir=deps` buat membongkarnya) — tidak perlu migrasi struktur dulu.
 
 ### Dua mode penempatan
 
@@ -180,14 +203,14 @@ Tidak menyentuh `go.work` — kalau modul ini standalone (punya `go.mod` sendiri
 ## Contoh Alur Penuh
 
 ```bash
-webcore-go-cli new my-api --module=orders   # project + modul default "orders", sudah terdaftar otomatis
+webcore-go-cli new my-api --module=orders   # workspace go.work + modul default "orders", sudah terdaftar otomatis
 cd my-api
 
-webcore-go-cli make entity OrderItem --module=orders   # entity kedua di modul yang sama
+webcore-go-cli make entity OrderItem --module=orders   # entity kedua di modul yang sama (modules/orders/go.mod ketemu otomatis)
 webcore-go-cli make migration create_orders_table --module=orders
 webcore-go-cli make library mailer                      # library kustom
 
-go run main.go
+webcore-go-cli run orders          # atau: go run ./deps/main.go orders
 ```
 
 Atau tanpa modul sama sekali:

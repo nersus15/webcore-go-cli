@@ -14,7 +14,18 @@ func newCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "new <nama-project>",
 		Short: "Buat project webcore baru",
-		Args:  cobra.ExactArgs(1),
+		Long: `Buat project webcore baru. Dua struktur, tergantung --module:
+
+  - Kosong (default): struktur "tanpa modul" — satu go.mod di root,
+    main.go + config.yaml saja, tidak ada deps/ atau modules/.
+
+  - Diisi: WORKSPACE go.work penuh dengan satu modul bisnis default yang
+    berdiri sendiri — go.work di root (tanpa go.mod/main.go di situ),
+    deps/ sebagai composition root (go.mod + main.go sendiri), dan
+    modules/<nama> sebagai modul bisnis (go.mod sendiri juga). Siap
+    langsung dipakai dengan "make module --deps-dir=deps" dan
+    "remove module --deps-dir=deps" begitu butuh modul kedua.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Args sudah divalidasi Cobra di titik ini — error dari sini
 			// ke bawah adalah error bisnis (folder sudah ada, dll.), bukan
@@ -30,8 +41,8 @@ func newCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&modulePath, "module-path", "", "module path Go, baris \"module\" di go.mod (default: nama project, lokal tanpa domain)")
-	cmd.Flags().StringVar(&moduleName, "module", "", "buat satu modul bisnis default dengan nama ini (modules/<nama> + deps/<nama>) — kosongkan utk project \"tanpa modul\" (lihat Quick Start webcore-docs)")
+	cmd.Flags().StringVar(&modulePath, "module-path", "", "module path Go dasar — root go.mod (tanpa modul) atau deps/go.mod + basis modules/<nama>/go.mod (dengan modul) (default: nama project, lokal tanpa domain)")
+	cmd.Flags().StringVar(&moduleName, "module", "", "bangun workspace go.work dengan satu modul bisnis default berdiri sendiri dengan nama ini (deps/ + modules/<nama>, masing-masing go.mod sendiri) — kosongkan utk project \"tanpa modul\" (satu go.mod di root, lihat Quick Start webcore-docs)")
 	cmd.Flags().BoolVar(&skipGet, "skip-get", false, "lewati `go get github.com/webcore-go/webcore` otomatis")
 
 	return cmd
