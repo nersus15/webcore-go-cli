@@ -121,10 +121,6 @@ Tambahkan manual:
 `, mainGoPath, err, importPath, pkg, pkg, pkg, pkg, pkg)
 	} else {
 		fmt.Printf("  updated: %s\n", mainGoPath)
-		fmt.Printf(`
-Jangan lupa tambahkan "./modules/%s" ke blok use() di go.work, lalu:
-  cd %s && go mod tidy
-`, pkg, root)
 	}
 
 	if err := generateDevEnvFor(pkg, absRoot, force); err != nil {

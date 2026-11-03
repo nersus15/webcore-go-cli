@@ -93,7 +93,35 @@ func NewModule(name, modulePathOverride string, force bool) error {
 	}
 
 	if standalone {
-		fmt.Printf(`
+		// "go work use" otomatis kalau project ini memang workspace
+		// (go.work ketemu naik ke direktori induk) — kalau bukan, tidak
+		// ada yang perlu ditambahkan sama sekali, jadi dilewati tanpa
+		// basa-basi.
+		addedToWork := false
+		if gomod.HasWorkspace(".") {
+			if err := runIn(".", "go", "work", "use", "./"+filepath.ToSlash(base)); err != nil {
+				fmt.Printf("  peringatan: 'go work use ./%s' gagal otomatis (%v) — tambahkan manual ke go.work\n", base, err)
+			} else {
+				fmt.Printf("  ditambahkan ke go.work: ./%s\n", base)
+				addedToWork = true
+			}
+		}
+
+		if addedToWork {
+			fmt.Printf(`
+Modul %q siap di %s/ sebagai Go module sendiri (%s), sudah terdaftar di go.work.
+
+Jangan lupa daftarkan di composition root Anda (nama filenya bervariasi per
+project, mis. deps/packages.go, app/packages.go):
+
+    import %s "%s"
+
+    var APP_PACKAGES = []core.Module{
+        %s.NewModule(),
+    }
+`, pkg, base, modulePathOverride, pkg, modulePathOverride, pkg)
+		} else {
+			fmt.Printf(`
 Modul %q siap di %s/ sebagai Go module sendiri (%s).
 
 Jangan lupa:
@@ -107,6 +135,7 @@ Jangan lupa:
         %s.NewModule(),
     }
 `, pkg, base, modulePathOverride, base, pkg, modulePathOverride, pkg)
+		}
 	} else {
 		fmt.Printf(`
 Modul %q siap di %s/.

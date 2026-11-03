@@ -109,7 +109,7 @@ webcore-go-cli make entity OrderItem --module=orders --force   # timpa kalau sud
 
 Kalau project Anda memakai [go.work](https://go.dev/ref/mod#workspaces) dengan tiap modul punya `go.mod` sendiri (lihat [workspace.md](https://github.com/webcore-go/webcore) § Proyek Multi-Modul) — tidak ada satu `go.mod` yang menaungi seluruh repo, jadi perlu sedikit berbeda:
 
-- **`make module <Nama> --module-path=<path>`** — buat modul baru yang berdiri sendiri (jalankan `go mod init <path>` otomatis di `modules/<nama>/`). `<path>` bisa berbeda total dari nama direktorinya — nama direktori cuma label folder, bukan sumber import path.
+- **`make module <Nama> --module-path=<path>`** — buat modul baru yang berdiri sendiri (jalankan `go mod init <path>` otomatis di `modules/<nama>/`). `<path>` bisa berbeda total dari nama direktorinya — nama direktori cuma label folder, bukan sumber import path. Kalau `go.work` ketemu (naik ke direktori induk), modul ini **otomatis didaftarkan** lewat `go work use ./modules/<nama>` — tidak perlu edit manual lagi. Kalau tidak ada `go.work` (atau `go work use`-nya gagal), CLI cuma mencetak instruksi manual, tidak menebak.
 
   ```bash
   webcore-go-cli make module satusehat --module-path=github.com/acme/mod-satusehat

@@ -151,3 +151,26 @@ func WorkspaceGoVersion(dir string) (version string, ok bool) {
 		d = parent
 	}
 }
+
+// HasWorkspace mencari go.work mulai dari dir naik ke direktori induk —
+// dipakai sebelum mencoba "go work use" otomatis (lihat NewModule mode
+// standalone), supaya tidak menjalankan command itu di project yang
+// memang tidak memakai workspace sama sekali.
+func HasWorkspace(dir string) bool {
+	d, err := filepath.Abs(dir)
+	if err != nil {
+		return false
+	}
+
+	for {
+		if _, err := os.Stat(filepath.Join(d, "go.work")); err == nil {
+			return true
+		}
+
+		parent := filepath.Dir(d)
+		if parent == d {
+			return false
+		}
+		d = parent
+	}
+}

@@ -229,11 +229,14 @@ func newProjectWithModule(opt NewProjectOptions) error {
 		}
 	}
 
+	// NewModule mode standalone sudah otomatis "go work use ./modules/<pkg>"
+	// sendiri (go.work di sini sudah ada sejak go work init di atas) — di
+	// sini cukup daftarkan deps/, yang dibuat langsung tanpa lewat NewModule.
 	if err := NewModule(pkg, standaloneModulePath, false); err != nil {
 		return fmt.Errorf("buat modul default %s: %w", pkg, err)
 	}
 
-	if err := runIn(".", "go", "work", "use", "./deps", "./modules/"+pkg); err != nil {
+	if err := runIn(".", "go", "work", "use", "./deps"); err != nil {
 		return fmt.Errorf("go work use: %w", err)
 	}
 
