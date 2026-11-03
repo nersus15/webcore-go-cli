@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/nersus15/webcore-go-cli/internal/names"
 	"github.com/nersus15/webcore-go-cli/internal/scaffold"
 )
 
@@ -37,6 +39,7 @@ func makeCmd() *cobra.Command {
 func makeModuleCmd() *cobra.Command {
 	var force bool
 	var modulePath string
+	var depsDir string
 
 	cmd := &cobra.Command{
 		Use:   "module <Nama>",
@@ -44,7 +47,17 @@ func makeModuleCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true // error dari sini adalah error bisnis, bukan soal cara pakai
-			return scaffold.NewModule(args[0], modulePath, force)
+			if err := scaffold.NewModule(args[0], modulePath, force); err != nil {
+				return err
+			}
+
+			if depsDir != "" {
+				if modulePath == "" {
+					return fmt.Errorf("--deps-dir cuma berlaku bersama --module-path (wiring per-service hanya untuk modul yang berdiri sendiri)")
+				}
+				return scaffold.WireDepsService(depsDir, names.Package(args[0]), modulePath, force)
+			}
+			return nil
 		},
 	}
 
@@ -53,6 +66,10 @@ func makeModuleCmd() *cobra.Command {
 		"buat modul ini sebagai Go module BARU yang berdiri sendiri dengan path ini "+
 			"(go mod init dijalankan otomatis) — dipakai di project multi-module/go.work, "+
 			"di mana nama direktori boleh berbeda dari import path")
+	cmd.Flags().StringVar(&depsDir, "deps-dir", "",
+		"generate <deps-dir>/<nama>/{libraries,packages}.go dan coba sisipkan wiring-nya "+
+			"ke <deps-dir>/main.go (pola composition-root per-service) — butuh --module-path, "+
+			"nama foldernya bebas (mis. \"deps\", \"app\")")
 	return cmd
 }
 
