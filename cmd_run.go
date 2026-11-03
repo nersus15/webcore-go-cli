@@ -13,38 +13,41 @@ import (
 
 func runCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run <module>",
-		Short: "Jalankan air -c air-<module>.toml (dev, hot-reload)",
-		Long: `Jalankan "air -c air-<module>.toml" untuk dev dengan hot-reload.
+		Use:   "run [module]",
+		Short: "Jalankan air -c air[-<module>].toml (dev, hot-reload)",
+		Long: `Jalankan air untuk dev dengan hot-reload.
 
-File air-<module>.toml dan .env-<module> digenerate otomatis oleh
-"make module <module> --module-path=... --deps-dir=..." — kalau belum
-ada, buat dulu lewat situ.`,
-		Args: cobra.ExactArgs(1),
+Argumen module OPSIONAL, tapi dicek dulu terhadap jenis project:
+  - Project TANPA modul (tidak ada folder modules/ berisi apa pun):
+    argumen boleh dikosongkan, jalankan "air -c air.toml".
+  - Project DENGAN modul (folder modules/ berisi minimal satu modul):
+    argumen WAJIB — tanpa itu, ambigu modul mana yang mau dijalankan,
+    jadi dikembalikan sebagai error, bukan menebak salah satu.
+
+File air[-<module>].toml dan .env[-<module>] digenerate otomatis oleh
+"make module ... --deps-dir=..." atau "new ... --module=..." — kalau
+belum ada, buat dulu lewat situ.`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
+			hasModules := projectHasModules()
+
+			if len(args) == 0 {
+				if hasModules {
+					moduleNames, _ := listModuleNames()
+					return fmt.Errorf(
+						"project ini punya modul (%v) — sebutkan nama modul yang mau dijalankan: "+
+							"webcore-go-cli run <nama>",
+						moduleNames,
+					)
+				}
+				return runAir("air.toml", "project tanpa modul — belum ada generator otomatis utk air.toml, buat manual (lihat air-<module>.toml yang digenerate 'make module ... --deps-dir=...' sebagai contoh pola-nya)")
+			}
+
 			pkg := names.Package(args[0])
 			airFile := fmt.Sprintf("air-%s.toml", pkg)
-
-			if _, err := os.Stat(airFile); err != nil {
-				return fmt.Errorf(
-					"%s tidak ditemukan di direktori ini — generate dulu lewat "+
-						"'webcore-go-cli make module %s --module-path=<path> --deps-dir=<folder>'",
-					airFile, args[0],
-				)
-			}
-
-			airBin, err := findAirBinary()
-			if err != nil {
-				return err
-			}
-
-			c := exec.Command(airBin, "-c", airFile)
-			c.Stdin = os.Stdin
-			c.Stdout = os.Stdout
-			c.Stderr = os.Stderr
-			return c.Run()
+			return runAir(airFile, fmt.Sprintf("generate dulu lewat 'webcore-go-cli make module %s --module-path=<path> --deps-dir=<folder>'", args[0]))
 		},
 	}
 
@@ -54,6 +57,46 @@ ada, buat dulu lewat situ.`,
 	}
 
 	return cmd
+}
+
+// projectHasModules menandai jenis project: true kalau folder modules/
+// ada dan berisi minimal satu entry — dipakai "run" utk menentukan apakah
+// argumen nama modul wajib diisi atau boleh dikosongkan.
+func projectHasModules() bool {
+	moduleNames, _ := listModuleNames()
+	return len(moduleNames) > 0
+}
+
+func listModuleNames() ([]string, error) {
+	entries, err := os.ReadDir("modules")
+	if err != nil {
+		return nil, err
+	}
+
+	var out []string
+	for _, e := range entries {
+		if e.IsDir() {
+			out = append(out, e.Name())
+		}
+	}
+	return out, nil
+}
+
+func runAir(airFile, hint string) error {
+	if _, err := os.Stat(airFile); err != nil {
+		return fmt.Errorf("%s tidak ditemukan di direktori ini — %s", airFile, hint)
+	}
+
+	airBin, err := findAirBinary()
+	if err != nil {
+		return err
+	}
+
+	c := exec.Command(airBin, "-c", airFile)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c.Run()
 }
 
 // findAirBinary cari "air" lewat PATH dulu (kasus normal: go install

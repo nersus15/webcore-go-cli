@@ -32,7 +32,7 @@ Jalankan `webcore-go-cli --help` untuk daftar lengkap. Ringkasan:
 
 | Perintah | Fungsi |
 | --- | --- |
-| `new <nama-project>` | Project baru lengkap (go.mod, main.go, config.yaml, deps/) |
+| `new <nama-project>` | Project baru — `--module=<nama>` utk modul default, kosongkan utk struktur "tanpa modul" |
 | `make module <Nama>` | Modul lengkap: module.go + config/entity/repository/service/handler |
 | `make config <Nama>` | `ConfigObject` satu-file (`SetDefaults`/`SetEnvBindings`) |
 | `make entity <Nama>` | Struct entity + Input |
@@ -43,11 +43,28 @@ Jalankan `webcore-go-cli --help` untuk daftar lengkap. Ringkasan:
 | `make library <Nama>` | Skeleton library kustom (`port.Library`/`Connector`/`LibraryLoader`) |
 | `make migration <nama>` | File migrasi goose (`NNNNN_nama.sql`, auto-increment) |
 | `rename-module <path-baru>` | Ganti module path (go.mod) + perbaiki semua import ke path lama, termasuk di module lain dalam go.work yang sama |
-| `run <module>` | Jalankan `air -c air-<module>.toml` (dev, hot-reload) — error kalau filenya belum ada |
+| `run [module]` | Jalankan `air -c air[-<module>].toml` (dev, hot-reload) — argumen opsional, tapi wajib diisi kalau project punya modul |
 
 Semua subcommand `make` (kecuali `new`) membaca module path dari `go.mod` project — dicari mulai dari direktori kerja saat ini, naik ke direktori induk kalau perlu (jadi tetap jalan dipanggil dari subfolder).
 
 > Subcommand `make` sengaja pakai spasi (`make module`), bukan titik dua (`make:module`) — titik dua ada di `COMP_WORDBREAKS` default bash, dan akan membuat completion tab tidak ter-insert dengan benar.
+
+### Project baru: dengan atau tanpa modul default (`new`)
+
+`new` punya DUA flag yang gampang tertukar — sengaja dipisah namanya biar tidak ambigu:
+
+- **`--module-path=<path>`** — module path Go, baris `module` di `go.mod` (default: nama project sendiri, lokal tanpa domain).
+- **`--module=<nama>`** — nama modul **bisnis** default yang mau dibuat sekaligus. Kosongkan untuk struktur ["tanpa modul"](https://github.com/webcore-go/webcore) (lihat Quick Start webcore-docs § Alternatif Tanpa Modul): cuma `main.go` + `go.mod` + `config.yaml`, tidak ada `deps/` atau `modules/` sama sekali.
+
+```bash
+# tanpa modul — main.go pakai core.NewApp(ctx, cfg, libraries, nil)
+webcore-go-cli new my-api
+
+# dengan satu modul default "orders" — modules/orders/ + deps/orders/{libraries,packages}.go
+webcore-go-cli new my-api --module=orders
+```
+
+Begitu `--module` diisi, `deps/<nama>/libraries.go` dan `deps/<nama>/packages.go` dinestkan di bawah folder `<nama>` (BUKAN flat di `deps/libraries.go`) — supaya kalau nanti nambah modul lagi lewat `make module <nama2> --deps-dir=deps`, polanya sudah konsisten dari awal.
 
 ### Dua mode penempatan
 
@@ -111,11 +128,17 @@ AUTH_TYPE=none
 
 ### Menjalankan dev (`run`)
 
+Argumen nama modul **opsional** — tapi `run` mengecek dulu jenis project-nya (ada isi di `modules/` atau tidak) sebelum menentukan apakah argumen itu wajib:
+
 ```bash
-webcore-go-cli run satusehat
+webcore-go-cli run satusehat   # project dengan modul → air -c air-satusehat.toml
+webcore-go-cli run             # project tanpa modul → air -c air.toml
 ```
 
-Sama dengan `air -c air-satusehat.toml` — error jelas kalau file itu belum ada (generate dulu lewat `make module ... --deps-dir=...`). Binary `air` dicari lewat `PATH` dulu, lalu fallback ke `~/air` — banyak setup nge-alias `air` ke binary yang didownload manual ke home directory, dan alias shell semacam itu tidak pernah ter-resolve lewat pencarian `PATH` biasa (`exec.Command` tidak lewat shell, jadi alias tidak berlaku).
+- Project **dengan** modul (`modules/` berisi minimal satu modul) tapi `run` dipanggil **tanpa** argumen → error jelas ("project ini punya modul (...) — sebutkan nama modul") — tidak pernah menebak modul mana yang dimaksud.
+- Project **tanpa** modul, argumen boleh dikosongkan.
+
+Binary `air` dicari lewat `PATH` dulu, lalu fallback ke `~/air` — banyak setup nge-alias `air` ke binary yang didownload manual ke home directory, dan alias shell semacam itu tidak pernah ter-resolve lewat pencarian `PATH` biasa (`exec.Command` tidak lewat shell, jadi alias tidak berlaku).
 
 ### Mengganti module path (`rename-module`)
 
@@ -139,15 +162,26 @@ Tidak menjangkau repo/module di luar workspace `go.work` saat ini — perbaiki m
 ## Contoh Alur Penuh
 
 ```bash
-webcore-go-cli new my-api
+webcore-go-cli new my-api --module=orders   # project + modul default "orders", sudah terdaftar otomatis
 cd my-api
-
-webcore-go-cli make module orders          # modul lengkap pertama
-# daftarkan manual di deps/packages.go (CLI mencetak snippet-nya)
 
 webcore-go-cli make entity OrderItem --module=orders   # entity kedua di modul yang sama
 webcore-go-cli make migration create_orders_table --module=orders
 webcore-go-cli make library mailer                      # library kustom
+
+go run main.go
+```
+
+Atau tanpa modul sama sekali:
+
+```bash
+webcore-go-cli new my-api
+cd my-api
+
+webcore-go-cli make entity Order     # rata di root — lihat "Dua mode penempatan"
+webcore-go-cli make repository Order
+webcore-go-cli make service Order
+webcore-go-cli make handler Order
 
 go run main.go
 ```
