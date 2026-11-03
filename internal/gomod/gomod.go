@@ -86,6 +86,38 @@ func ModulePathAt(dir string) (path string, ok bool) {
 	return "", false
 }
 
+// FindModuleUpward mencari go.mod mulai dari startDir, naik ke direktori
+// induk kalau tidak ketemu di situ — sama seperti DetectModulePath, tapi
+// TIDAK melakukan os.Chdir dan beroperasi di direktori yang dikasih
+// (bukan cwd proses) — dipakai untuk mencari go.mod milik direktori LAIN
+// dari module project utama yang sedang dikerjakan (mis. composition
+// root "app/" saat module baru sedang dibuat di "modules/<pkg>/").
+// Mengembalikan direktori root yang ketemu beserta module path-nya.
+func FindModuleUpward(startDir string) (root, path string, err error) {
+	dir, err := filepath.Abs(startDir)
+	if err != nil {
+		return "", "", fmt.Errorf("baca path %s: %w", startDir, err)
+	}
+
+	for {
+		if p, ok := ModulePathAt(dir); ok {
+			return dir, p, nil
+		}
+
+		if _, err := os.Stat(filepath.Join(dir, "go.work")); err == nil {
+			return "", "", fmt.Errorf("ketemu go.work di %s tapi tidak ada go.mod di situ maupun di induk %s", dir, startDir)
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	return "", "", fmt.Errorf("go.mod tidak ditemukan di %s maupun direktori induknya", startDir)
+}
+
 // WorkspaceGoVersion mencari go.work mulai dari dir naik ke direktori
 // induk, dan mengembalikan versi Go yang dideklarasikannya (baris "go
 // X.Y.Z"). Dipakai supaya go.mod baru yang dibuat "go mod init" untuk

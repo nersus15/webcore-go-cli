@@ -17,11 +17,21 @@ import (
 // sendiri (--module-path), untuk project yang mengikuti pola "composition
 // root per service" seperti di contoh satusehat-fhir-webcore:
 //
-//	<depsDir>/
+//	<root>/
 //	├── main.go              # dispatch berdasarkan argumen CLI/service
 //	└── <pkg>/
 //	    ├── libraries.go      # APP_LIBRARIES khusus service ini
 //	    └── packages.go       # APP_PACKAGES khusus service ini
+//
+// depsDir menerima DUA bentuk:
+//
+//   - Root composition root itu sendiri (mis. "app", yang punya go.mod
+//     langsung di situ) — subfolder per-service ("app/<pkg>/") otomatis
+//     ditambahkan.
+//   - Path lengkap ke subfolder tujuan (mis. "app/satusehat", yang
+//     SENDIRI tidak punya go.mod, tapi induknya "app" punya) — dipakai
+//     persis apa adanya, tidak di-append lagi. go.mod/main.go tetap
+//     dicari lewat FindModuleUpward dari situ.
 //
 // Langkah 1 (generate libraries.go/packages.go) selalu aman — file baru,
 // tidak menyentuh apa pun yang sudah ada. Langkah 2 (edit main.go) best-
@@ -30,9 +40,42 @@ import (
 // kali di file itu — kalau ambigu atau tidak ketemu, tidak menebak, cuma
 // mencetak instruksi manual.
 func WireDepsService(depsDir, pkg, modulePathOverride string, force bool) error {
-	depsModulePath, ok := gomod.ModulePathAt(depsDir)
-	if !ok {
-		return fmt.Errorf("%s tidak punya go.mod — tidak bisa generate wiring service di situ", depsDir)
+	var targetDir, root, depsModulePath string
+
+	if dmp, ok := gomod.ModulePathAt(depsDir); ok {
+		// depsDir ITU SENDIRI root composition root — tambahkan subfolder per service.
+		root = depsDir
+		depsModulePath = dmp
+		targetDir = filepath.Join(depsDir, pkg)
+	} else {
+		foundRoot, dmp, err := gomod.FindModuleUpward(depsDir)
+		if err != nil {
+			return fmt.Errorf("%s: %w", depsDir, err)
+		}
+		root = foundRoot
+		depsModulePath = dmp
+		targetDir = depsDir // sudah lengkap sesuai yang diketik pemanggil
+	}
+
+	// root dari FindModuleUpward/depsDir bisa absolut sementara targetDir
+	// relatif (atau sebaliknya) — samakan dulu jadi absolut biar
+	// filepath.Rel tidak menolak membandingkan keduanya.
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return fmt.Errorf("baca path %s: %w", root, err)
+	}
+	absTarget, err := filepath.Abs(targetDir)
+	if err != nil {
+		return fmt.Errorf("baca path %s: %w", targetDir, err)
+	}
+
+	relSuffix, err := filepath.Rel(absRoot, absTarget)
+	if err != nil {
+		return fmt.Errorf("hitung path relatif %s dari %s: %w", targetDir, root, err)
+	}
+	importPath := depsModulePath
+	if relSuffix != "." {
+		importPath = depsModulePath + "/" + filepath.ToSlash(relSuffix)
 	}
 
 	data := map[string]string{
@@ -40,7 +83,6 @@ func WireDepsService(depsDir, pkg, modulePathOverride string, force bool) error 
 		"ModulePathOverride": modulePathOverride,
 	}
 
-	base := filepath.Join(depsDir, pkg)
 	files := map[string]string{
 		"libraries.go": depsLibrariesTmpl,
 		"packages.go":  depsPackagesTmpl,
@@ -50,13 +92,12 @@ func WireDepsService(depsDir, pkg, modulePathOverride string, force bool) error 
 		if err != nil {
 			return fmt.Errorf("render %s: %w", rel, err)
 		}
-		if err := WriteFile(filepath.Join(base, rel), content, force); err != nil {
+		if err := WriteFile(filepath.Join(targetDir, rel), content, force); err != nil {
 			return err
 		}
 	}
 
-	mainGoPath := filepath.Join(depsDir, "main.go")
-	importPath := depsModulePath + "/" + pkg
+	mainGoPath := filepath.Join(root, "main.go")
 	if err := wireMainGo(mainGoPath, pkg, importPath); err != nil {
 		fmt.Printf(`
 Tidak bisa otomatis mengubah %s (%v).
@@ -77,7 +118,7 @@ Tambahkan manual:
 	fmt.Printf(`
 Jangan lupa tambahkan "./modules/%s" ke blok use() di go.work, lalu:
   cd %s && go mod tidy
-`, pkg, depsDir)
+`, pkg, root)
 
 	return nil
 }
