@@ -77,6 +77,27 @@ Kalau project Anda memakai [go.work](https://go.dev/ref/mod#workspaces) dengan t
 
 Kalau dijalankan dari root project (ada `go.work`, tidak ada `go.mod` di situ) tanpa `--module-path` atau `--module` yang sesuai, CLI akan menolak dengan pesan error yang menjelaskan opsi mana yang harus dipakai — bukan asal tebak.
 
+`go mod init` yang dijalankan otomatis untuk module baru ikut menyamakan versi Go dengan yang dideklarasikan `go.work` (bukan selalu versi toolchain lokal) — supaya tidak langsung error "requires go >= X tapi go.work lists Y".
+
+### Wiring per-service (`--deps-dir`), untuk pola composition-root multi-service
+
+Kalau project Anda punya composition root yang dispatch per-service lewat argumen CLI (satu `main.go` yang `switch service { case "a": ...; case "b": ...; default: }`, dengan tiap service punya folder `<deps>/<service>/{libraries,packages}.go` sendiri — lihat contoh nyata di [workspace.md](https://github.com/webcore-go/webcore) § Composition Root), tambahkan `--deps-dir=<nama-folder>` ke `make module --module-path=...`:
+
+```bash
+webcore-go-cli make module satusehat \
+  --module-path=github.com/acme/mod-satusehat \
+  --deps-dir=app
+```
+
+Ini akan:
+
+1. Generate `app/satusehat/libraries.go` dan `app/satusehat/packages.go` (file baru, selalu aman).
+2. **Coba** mengedit `app/main.go` secara otomatis lewat AST Go (bukan regex) — menambahkan import, entry `"satusehat": true` ke map `validServices`-nya, dan `case "satusehat":` ke switch dispatch-nya, tepat sebelum `default:`. Hasilnya diverifikasi lewat `go/format` sebelum ditulis.
+
+Langkah 2 **best-effort**: kalau polanya (map `map[string]bool` atau switch `switch x { case "a": ... default: }`) tidak ketemu atau ambigu (lebih dari satu kandidat) di `main.go`, CLI tidak menebak — cukup mencetak snippet yang harus ditambahkan manual. Nama folder `<deps-dir>` bebas (`deps`, `app`, dll.) — bukan konvensi yang di-hardcode.
+
+Diverifikasi terhadap project `go.work` multi-service nyata (composition root dengan `validServices` map + switch per-service + override port) — hasil edit `main.go` tetap `go build` bersih, komentar dan kode lain yang sudah ada tidak terganggu.
+
 ### Mengganti module path (`rename-module`)
 
 Butuh ganti module path setelah project sudah berjalan (mis. salah nama waktu `go mod init`, atau pindah org)? `rename-module`:
