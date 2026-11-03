@@ -2,14 +2,16 @@ package scaffold
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
+	"github.com/nersus15/webcore-go-cli/internal/gomod"
 	"github.com/nersus15/webcore-go-cli/internal/names"
 )
 
 // ModuleData adalah variabel yang tersedia di semua template modul.
 type ModuleData struct {
-	ModulePath string // module path project, mis. github.com/acme/my-api
+	ImportBase string // base import path utk entity/repository/service/handler/config milik modul ini
 	Pkg        string // nama package/direktori, mis. "orders"
 	Entity     string // PascalCase, mis. "Order"
 	Table      string // nama tabel, mis. "orders"
@@ -18,18 +20,50 @@ type ModuleData struct {
 // NewModule membuat modul lengkap (module.go + config/entity/repository/
 // service/handler) di modules/<pkg>/, mengikuti pola yang didokumentasikan
 // di webcore-docs § Pengembangan Modul.
-func NewModule(modulePath, name string, force bool) error {
+//
+// Dua mode, tergantung modulePathOverride:
+//
+//   - Kosong (""): mode klasik, dinestkan di bawah go.mod project saat
+//     ini (dicari lewat gomod.DetectModulePath, naik ke direktori induk
+//     kalau perlu) — modules/<pkg>/ diimpor sebagai
+//     "<module root>/modules/<pkg>/...".
+//
+//   - Diisi: modul ini dibuat sebagai Go module BARU yang berdiri sendiri
+//     (go mod init dijalankan di modules/<pkg>/ dengan path persis yang
+//     diberikan) — dipakai untuk project multi-module/go.work di mana
+//     tiap modul punya go.mod sendiri dan nama direktori boleh berbeda
+//     dari import path-nya (lihat workspace.md § Proyek Multi-Modul).
+func NewModule(name, modulePathOverride string, force bool) error {
 	pkg := names.Package(name)
 	entity := names.Pascal(name)
+	base := filepath.Join("modules", pkg)
+
+	var importBase string
+	standalone := modulePathOverride != ""
+
+	if standalone {
+		importBase = modulePathOverride
+		if err := os.MkdirAll(base, 0o755); err != nil {
+			return fmt.Errorf("buat direktori %s: %w", base, err)
+		}
+		if err := runIn(base, "go", "mod", "init", modulePathOverride); err != nil {
+			return fmt.Errorf("go mod init di %s: %w", base, err)
+		}
+	} else {
+		modulePath, err := gomod.DetectModulePath()
+		if err != nil {
+			return err
+		}
+		importBase = modulePath + "/modules/" + pkg
+	}
 
 	data := ModuleData{
-		ModulePath: modulePath,
+		ImportBase: importBase,
 		Pkg:        pkg,
 		Entity:     entity,
 		Table:      names.Table(name),
 	}
 
-	base := filepath.Join("modules", pkg)
 	files := map[string]string{
 		"module.go":                moduleGoTmpl,
 		"config/config.go":         moduleConfigTmpl,
@@ -49,20 +83,38 @@ func NewModule(modulePath, name string, force bool) error {
 		}
 	}
 
-	fmt.Printf(`
+	if standalone {
+		fmt.Printf(`
+Modul %q siap di %s/ sebagai Go module sendiri (%s).
+
+Jangan lupa:
+  1. Tambahkan "./%s" ke blok use() di go.work.
+  2. Daftarkan di composition root Anda (nama filenya bervariasi per
+     project, mis. deps/packages.go, app/packages.go):
+
+    import %s "%s"
+
+    var APP_PACKAGES = []core.Module{
+        %s.NewModule(),
+    }
+`, pkg, base, modulePathOverride, base, pkg, modulePathOverride, pkg)
+	} else {
+		fmt.Printf(`
 Modul %q siap di %s/.
 
-Jangan lupa daftarkan di deps/packages.go:
+Jangan lupa daftarkan di composition root Anda (nama filenya bervariasi
+per project, mis. deps/packages.go, app/packages.go):
 
-    import "%s/modules/%s"
+    import "%s"
 
     var APP_PACKAGES = []core.Module{
         %s.NewModule(),
     }
 
-Dan kalau modul ini butuh database, daftarkan loader-nya di deps/libraries.go
-(mis. "database:postgres": &postgres.PostgresLoader{}).
-`, pkg, base, modulePath, pkg, pkg)
+Dan kalau modul ini butuh database, daftarkan loader-nya di tempat yang
+sama (mis. "database:postgres": &postgres.PostgresLoader{}).
+`, pkg, base, importBase, pkg)
+	}
 
 	return nil
 }
@@ -74,10 +126,10 @@ import (
 	appConfig "github.com/webcore-go/webcore/infra/config"
 	"github.com/webcore-go/webcore/port"
 
-	"{{.ModulePath}}/modules/{{.Pkg}}/config"
-	"{{.ModulePath}}/modules/{{.Pkg}}/handler"
-	"{{.ModulePath}}/modules/{{.Pkg}}/repository"
-	"{{.ModulePath}}/modules/{{.Pkg}}/service"
+	"{{.ImportBase}}/config"
+	"{{.ImportBase}}/handler"
+	"{{.ImportBase}}/repository"
+	"{{.ImportBase}}/service"
 )
 
 const (
@@ -192,8 +244,8 @@ import (
 	"github.com/webcore-go/webcore/app/core"
 	"github.com/webcore-go/webcore/port"
 
-	"{{.ModulePath}}/modules/{{.Pkg}}/config"
-	"{{.ModulePath}}/modules/{{.Pkg}}/entity"
+	"{{.ImportBase}}/config"
+	"{{.ImportBase}}/entity"
 )
 
 type {{.Entity}}Repository interface {
@@ -256,8 +308,8 @@ import (
 
 	"github.com/webcore-go/webcore/app/core"
 
-	"{{.ModulePath}}/modules/{{.Pkg}}/entity"
-	"{{.ModulePath}}/modules/{{.Pkg}}/repository"
+	"{{.ImportBase}}/entity"
+	"{{.ImportBase}}/repository"
 )
 
 type {{.Entity}}Service interface {
@@ -298,8 +350,8 @@ import (
 	"github.com/webcore-go/webcore/app/helper"
 	"github.com/webcore-go/webcore/app/out"
 
-	"{{.ModulePath}}/modules/{{.Pkg}}/entity"
-	"{{.ModulePath}}/modules/{{.Pkg}}/service"
+	"{{.ImportBase}}/entity"
+	"{{.ImportBase}}/service"
 )
 
 type Handler struct {

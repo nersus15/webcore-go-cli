@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/nersus15/webcore-go-cli/internal/gomod"
 	"github.com/nersus15/webcore-go-cli/internal/names"
 )
 
@@ -11,7 +12,6 @@ import (
 // (config/entity/repository/service/handler) yang bisa ditaruh di root
 // project (tanpa modul) atau di-scope ke dalam modul lewat --module.
 type StandaloneData struct {
-	ModulePath    string
 	Entity        string
 	Pkg           string
 	Table         string
@@ -22,37 +22,80 @@ type StandaloneData struct {
 
 // resolveScope menentukan direktori tujuan dan import path untuk satu
 // "kind" (entity/repository/service/handler/config), tergantung ada
-// --module atau tidak. Tanpa --module, hasilnya rata di root project
-// (mis. entity/order.go) — pola yang didokumentasikan di Quick Start
-// § Alternatif Tanpa Modul. Dengan --module=orders, hasilnya masuk ke
-// modules/orders/<kind>/ — menambah entity/file baru ke modul yang sudah ada.
-func resolveScope(modulePath, moduleScope, kind string) (dir, importPath string) {
+// --module atau tidak:
+//
+//   - Tanpa --module: rata di root project (mis. entity/order.go) —
+//     pola yang didokumentasikan di Quick Start § Alternatif Tanpa Modul.
+//     Butuh go.mod di root project (dicari lewat gomod.DetectModulePath,
+//     yang juga naik ke direktori induk kalau perlu).
+//
+//   - Dengan --module=orders DAN modules/orders/ punya go.mod sendiri
+//     (pola project multi-module/go.work, lihat workspace.md): pakai
+//     module path ASLI dari go.mod itu — tidak pernah ditebak dari nama
+//     direktori, karena keduanya boleh berbeda.
+//
+//   - Dengan --module=orders tapi modules/orders/ TIDAK punya go.mod
+//     sendiri: fallback ke pola lama, dinestkan di bawah go.mod root
+//     project (modules/orders/<kind> diimpor sebagai
+//     "<module root>/modules/orders/<kind>").
+func resolveScope(moduleScope, kind string) (dir, importPath string, err error) {
 	if moduleScope == "" {
-		return kind, modulePath + "/" + kind
+		modulePath, err := gomod.DetectModulePath()
+		if err != nil {
+			return "", "", err
+		}
+		return kind, modulePath + "/" + kind, nil
 	}
+
 	scopePkg := names.Package(moduleScope)
-	return filepath.Join("modules", scopePkg, kind), modulePath + "/modules/" + scopePkg + "/" + kind
+	moduleDir := filepath.Join("modules", scopePkg)
+	dir = filepath.Join(moduleDir, kind)
+
+	if ownPath, ok := gomod.ModulePathAt(moduleDir); ok {
+		return dir, ownPath + "/" + kind, nil
+	}
+
+	modulePath, err := gomod.DetectModulePath()
+	if err != nil {
+		return "", "", fmt.Errorf("modul %q tidak punya go.mod sendiri di %s, dan: %w", moduleScope, moduleDir, err)
+	}
+	return dir, modulePath + "/modules/" + scopePkg + "/" + kind, nil
 }
 
-func buildStandaloneData(modulePath, name, moduleScope string) StandaloneData {
-	_, entityImport := resolveScope(modulePath, moduleScope, "entity")
-	_, repoImport := resolveScope(modulePath, moduleScope, "repository")
-	_, svcImport := resolveScope(modulePath, moduleScope, "service")
+func buildStandaloneData(name, moduleScope string) (StandaloneData, error) {
+	_, entityImport, err := resolveScope(moduleScope, "entity")
+	if err != nil {
+		return StandaloneData{}, err
+	}
+	_, repoImport, err := resolveScope(moduleScope, "repository")
+	if err != nil {
+		return StandaloneData{}, err
+	}
+	_, svcImport, err := resolveScope(moduleScope, "service")
+	if err != nil {
+		return StandaloneData{}, err
+	}
 
 	return StandaloneData{
-		ModulePath:    modulePath,
 		Entity:        names.Pascal(name),
 		Pkg:           names.Package(name),
 		Table:         names.Table(name),
 		EntityImport:  entityImport,
 		RepoImport:    repoImport,
 		ServiceImport: svcImport,
-	}
+	}, nil
 }
 
-func writeStandalone(modulePath, name, moduleScope, kind, tmpl string, force bool) error {
-	data := buildStandaloneData(modulePath, name, moduleScope)
-	dir, _ := resolveScope(modulePath, moduleScope, kind)
+func writeStandalone(name, moduleScope, kind, tmpl string, force bool) error {
+	dir, _, err := resolveScope(moduleScope, kind)
+	if err != nil {
+		return err
+	}
+
+	data, err := buildStandaloneData(name, moduleScope)
+	if err != nil {
+		return err
+	}
 
 	content, err := render(tmpl, data)
 	if err != nil {
@@ -63,29 +106,29 @@ func writeStandalone(modulePath, name, moduleScope, kind, tmpl string, force boo
 }
 
 // NewEntity membuat file entity baru (struct + Input struct).
-func NewEntity(modulePath, name, moduleScope string, force bool) error {
-	return writeStandalone(modulePath, name, moduleScope, "entity", entityTmpl, force)
+func NewEntity(name, moduleScope string, force bool) error {
+	return writeStandalone(name, moduleScope, "entity", entityTmpl, force)
 }
 
 // NewConfig membuat ConfigObject baru (SetDefaults/SetEnvBindings) —
 // bisa dipakai lewat config.LoadDefaultConfigModule tanpa perlu core.Module.
-func NewConfig(modulePath, name, moduleScope string, force bool) error {
-	return writeStandalone(modulePath, name, moduleScope, "config", configTmpl, force)
+func NewConfig(name, moduleScope string, force bool) error {
+	return writeStandalone(name, moduleScope, "config", configTmpl, force)
 }
 
 // NewRepository membuat repository baru di atas port.IDatabase.
-func NewRepository(modulePath, name, moduleScope string, force bool) error {
-	return writeStandalone(modulePath, name, moduleScope, "repository", repositoryTmpl, force)
+func NewRepository(name, moduleScope string, force bool) error {
+	return writeStandalone(name, moduleScope, "repository", repositoryTmpl, force)
 }
 
 // NewService membuat service baru yang membungkus repository.
-func NewService(modulePath, name, moduleScope string, force bool) error {
-	return writeStandalone(modulePath, name, moduleScope, "service", serviceTmpl, force)
+func NewService(name, moduleScope string, force bool) error {
+	return writeStandalone(name, moduleScope, "service", serviceTmpl, force)
 }
 
 // NewHandler membuat Fiber handler baru yang membungkus service.
-func NewHandler(modulePath, name, moduleScope string, force bool) error {
-	return writeStandalone(modulePath, name, moduleScope, "handler", handlerTmpl, force)
+func NewHandler(name, moduleScope string, force bool) error {
+	return writeStandalone(name, moduleScope, "handler", handlerTmpl, force)
 }
 
 // NewHelper membuat package helper mandiri di helper/<nama>.go — tidak

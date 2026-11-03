@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/nersus15/webcore-go-cli/internal/gomod"
 	"github.com/nersus15/webcore-go-cli/internal/scaffold"
 )
 
@@ -37,6 +36,7 @@ func makeCmd() *cobra.Command {
 
 func makeModuleCmd() *cobra.Command {
 	var force bool
+	var modulePath string
 
 	cmd := &cobra.Command{
 		Use:   "module <Nama>",
@@ -44,23 +44,25 @@ func makeModuleCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true // error dari sini adalah error bisnis, bukan soal cara pakai
-			modulePath, err := gomod.DetectModulePath()
-			if err != nil {
-				return err
-			}
-			return scaffold.NewModule(modulePath, args[0], force)
+			return scaffold.NewModule(args[0], modulePath, force)
 		},
 	}
 
 	cmd.Flags().BoolVar(&force, "force", false, "timpa file yang sudah ada")
+	cmd.Flags().StringVar(&modulePath, "module-path", "",
+		"buat modul ini sebagai Go module BARU yang berdiri sendiri dengan path ini "+
+			"(go mod init dijalankan otomatis) — dipakai di project multi-module/go.work, "+
+			"di mana nama direktori boleh berbeda dari import path")
 	return cmd
 }
 
-type standaloneFn func(modulePath, name, moduleScope string, force bool) error
+type standaloneFn func(name, moduleScope string, force bool) error
 
 // makeStandaloneCmd menangani config/entity/repository/service/handler —
 // semuanya punya bentuk flag yang sama: nama positional + --module opsional
 // (scope ke modul yang sudah ada, default rata di root project) + --force.
+// Resolusi module path (termasuk deteksi go.work, dan go.mod milik modul
+// yang di-scope) didelegasikan ke package scaffold — lihat resolveScope.
 func makeStandaloneCmd(noun, short string, fn standaloneFn) *cobra.Command {
 	var module string
 	var force bool
@@ -71,11 +73,7 @@ func makeStandaloneCmd(noun, short string, fn standaloneFn) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			modulePath, err := gomod.DetectModulePath()
-			if err != nil {
-				return err
-			}
-			return fn(modulePath, args[0], module, force)
+			return fn(args[0], module, force)
 		},
 	}
 
