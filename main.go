@@ -24,6 +24,7 @@ func main() {
 		newCmd(),
 		makeCmd(),
 		renameModuleCmd(),
+		removeCmd(),
 		runCmd(),
 	)
 

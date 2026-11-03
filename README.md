@@ -43,6 +43,7 @@ Jalankan `webcore-go-cli --help` untuk daftar lengkap. Ringkasan:
 | `make library <Nama>` | Skeleton library kustom (`port.Library`/`Connector`/`LibraryLoader`) |
 | `make migration <nama>` | File migrasi goose (`NNNNN_nama.sql`, auto-increment) |
 | `rename-module <path-baru>` | Ganti module path (go.mod) + perbaiki semua import ke path lama, termasuk di module lain dalam go.work yang sama |
+| `remove module <nama>` | Hapus modul: `modules/<nama>`, `<deps>/<nama>`, wiring di `<deps>/main.go`, `.env-<nama>`, `air-<nama>.toml` |
 | `run [module]` | Jalankan `air -c air[-<module>].toml` (dev, hot-reload) — argumen opsional, tapi wajib diisi kalau project punya modul |
 
 Semua subcommand `make` (kecuali `new`) membaca module path dari `go.mod` project — dicari mulai dari direktori kerja saat ini, naik ke direktori induk kalau perlu (jadi tetap jalan dipanggil dari subfolder).
@@ -158,6 +159,23 @@ webcore-go-cli rename-module github.com/acme/my-api-v2 --dry-run  # lihat dulu f
 `--module=<nama>` cuma berlaku untuk modul yang sudah punya `go.mod` sendiri (dibuat lewat `make module --module-path=...`) — bukan modul klasik yang dinestkan di bawah go.mod root.
 
 Tidak menjangkau repo/module di luar workspace `go.work` saat ini — perbaiki manual kalau ada project lain (di luar workspace ini) yang juga meng-import module yang di-rename.
+
+### Menghapus modul (`remove module`)
+
+Kebalikan dari `make module ... --deps-dir=...`. Menghapus:
+
+1. `modules/<nama>/`
+2. `<deps-dir>/<nama>/` — kalau `--deps-dir` diisi (sama seperti dipakai saat `make module`), fallback ke `deps/<nama>` (pola `new --module=<nama>`) kalau tidak.
+3. Entry modul ini di `switch service` dan map `validServices` di `<deps-dir>/main.go` — best-effort lewat AST, HANYA kalau `--deps-dir` diisi. Import-nya ikut dihapus KECUALI identifier paketnya masih dipakai di tempat lain di file itu (mis. `default:` yang diam-diam menduplikasi salah satu case) — kalau begitu, dibiarkan dan dicetak catatan untuk dicek manual.
+4. `.env-<nama>` dan `air-<nama>.toml`
+
+```bash
+webcore-go-cli remove module orders --deps-dir=app
+
+webcore-go-cli remove module orders --deps-dir=app --dry-run   # lihat dulu apa yang akan dihapus
+```
+
+Tidak menyentuh `go.work` — kalau modul ini standalone (punya `go.mod` sendiri), hapus manual entry `"./modules/<nama>"` dari blok `use()`-nya.
 
 ## Contoh Alur Penuh
 

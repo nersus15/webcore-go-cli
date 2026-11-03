@@ -233,11 +233,13 @@ func wireMainGo(mainGoPath, pkg, importPath string) error {
 	return os.WriteFile(mainGoPath, formatted, 0o644)
 }
 
-// findValidServicesMapPos mencari literal map[string]bool di file dan
-// mengembalikan posisi tepat sebelum elemen pertamanya (atau sebelum "}"
-// kalau kosong). Error kalau ketemu nol atau lebih dari satu kandidat —
-// demi keamanan, tidak menebak kalau ambigu.
-func findValidServicesMapPos(file *ast.File) (token.Pos, error) {
+// findValidServicesMap mencari literal map[string]bool di file — dipakai
+// bersama oleh findValidServicesMapPos (insersi, lihat wireMainGo) dan
+// findValidServicesEntryRange (penghapusan, lihat unwireMainGo di
+// remove.go), supaya kriteria "map mana yang dimaksud" tidak bercabang
+// dua. Error kalau ketemu nol atau lebih dari satu kandidat — demi
+// keamanan, tidak menebak kalau ambigu.
+func findValidServicesMap(file *ast.File) (*ast.CompositeLit, error) {
 	var candidates []*ast.CompositeLit
 
 	ast.Inspect(file, func(n ast.Node) bool {
@@ -258,22 +260,31 @@ func findValidServicesMapPos(file *ast.File) (token.Pos, error) {
 	})
 
 	if len(candidates) != 1 {
-		return 0, fmt.Errorf("ketemu %d literal map[string]bool (butuh tepat 1)", len(candidates))
+		return nil, fmt.Errorf("ketemu %d literal map[string]bool (butuh tepat 1)", len(candidates))
 	}
+	return candidates[0], nil
+}
 
-	cl := candidates[0]
+// findValidServicesMapPos mengembalikan posisi tepat sebelum elemen
+// pertama map validServices (atau sebelum "}" kalau kosong), supaya entry
+// baru bisa disisipkan di situ.
+func findValidServicesMapPos(file *ast.File) (token.Pos, error) {
+	cl, err := findValidServicesMap(file)
+	if err != nil {
+		return 0, err
+	}
 	if len(cl.Elts) == 0 {
 		return cl.Rbrace, nil
 	}
 	return cl.Elts[0].Pos(), nil
 }
 
-// findSwitchDefaultPos mencari switch statement yang semua case-nya
+// findValidServicesSwitch mencari switch statement yang semua case-nya
 // string literal plus satu default (pola "switch service { case \"x\":
-// ... default: }"), dan mengembalikan posisi tepat di case "default:"-nya
-// supaya case baru bisa disisipkan sebelum situ. Error kalau ketemu nol
-// atau lebih dari satu kandidat.
-func findSwitchDefaultPos(file *ast.File) (token.Pos, error) {
+// ... default: }") — dipakai bersama oleh findSwitchDefaultPos (insersi)
+// dan findSwitchCaseRange (penghapusan, lihat remove.go). Error kalau
+// ketemu nol atau lebih dari satu kandidat.
+func findValidServicesSwitch(file *ast.File) (*ast.SwitchStmt, error) {
 	var candidates []*ast.SwitchStmt
 
 	ast.Inspect(file, func(n ast.Node) bool {
@@ -310,10 +321,20 @@ func findSwitchDefaultPos(file *ast.File) (token.Pos, error) {
 	})
 
 	if len(candidates) != 1 {
-		return 0, fmt.Errorf(`ketemu %d switch berpola 'switch x { case "a": ... default: }' (butuh tepat 1)`, len(candidates))
+		return nil, fmt.Errorf(`ketemu %d switch berpola 'switch x { case "a": ... default: }' (butuh tepat 1)`, len(candidates))
+	}
+	return candidates[0], nil
+}
+
+// findSwitchDefaultPos mengembalikan posisi tepat di case "default:" dari
+// switch validServices, supaya case baru bisa disisipkan sebelum situ.
+func findSwitchDefaultPos(file *ast.File) (token.Pos, error) {
+	sw, err := findValidServicesSwitch(file)
+	if err != nil {
+		return 0, err
 	}
 
-	for _, stmt := range candidates[0].Body.List {
+	for _, stmt := range sw.Body.List {
 		cc, ok := stmt.(*ast.CaseClause)
 		if ok && cc.List == nil {
 			return cc.Pos(), nil
