@@ -13,6 +13,29 @@ import (
 	"github.com/nersus15/webcore-go-cli/internal/gomod"
 )
 
+// resolveDepsPaths menentukan root composition root (tempat main.go
+// berada) dan targetDir (tempat libraries.go/packages.go per-service
+// berada) dari depsDir, dalam dua bentuk sekaligus — dipakai bersama oleh
+// WireDepsService (saat menambah service) dan RemoveModule (saat
+// menghapusnya), supaya logikanya tidak bercabang dua:
+//
+//   - depsDir ITU SENDIRI root composition root (punya go.mod langsung
+//     di situ, mis. "app") — targetDir = depsDir/pkg.
+//   - depsDir path lengkap ke subfolder tujuan (mis. "app/satusehat",
+//     tidak punya go.mod sendiri tapi induknya "app" punya) — targetDir
+//     = depsDir apa adanya, root dicari lewat FindModuleUpward.
+func resolveDepsPaths(depsDir, pkg string) (root, targetDir, depsModulePath string, err error) {
+	if dmp, ok := gomod.ModulePathAt(depsDir); ok {
+		return depsDir, filepath.Join(depsDir, pkg), dmp, nil
+	}
+
+	foundRoot, dmp, err := gomod.FindModuleUpward(depsDir)
+	if err != nil {
+		return "", "", "", fmt.Errorf("%s: %w", depsDir, err)
+	}
+	return foundRoot, depsDir, dmp, nil
+}
+
 // WireDepsService dipakai setelah NewModule membuat module baru berdiri
 // sendiri (--module-path), untuk project yang mengikuti pola "composition
 // root per service" seperti di contoh satusehat-fhir-webcore:
@@ -40,26 +63,11 @@ import (
 // kali di file itu — kalau ambigu atau tidak ketemu, tidak menebak, cuma
 // mencetak instruksi manual.
 func WireDepsService(depsDir, pkg, modulePathOverride string, force bool) error {
-	var targetDir, root, depsModulePath string
-
-	if dmp, ok := gomod.ModulePathAt(depsDir); ok {
-		// depsDir ITU SENDIRI root composition root — tambahkan subfolder per service.
-		root = depsDir
-		depsModulePath = dmp
-		targetDir = filepath.Join(depsDir, pkg)
-	} else {
-		foundRoot, dmp, err := gomod.FindModuleUpward(depsDir)
-		if err != nil {
-			return fmt.Errorf("%s: %w", depsDir, err)
-		}
-		root = foundRoot
-		depsModulePath = dmp
-		targetDir = depsDir // sudah lengkap sesuai yang diketik pemanggil
+	root, targetDir, depsModulePath, err := resolveDepsPaths(depsDir, pkg)
+	if err != nil {
+		return err
 	}
 
-	// root dari FindModuleUpward/depsDir bisa absolut sementara targetDir
-	// relatif (atau sebaliknya) — samakan dulu jadi absolut biar
-	// filepath.Rel tidak menolak membandingkan keduanya.
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
 		return fmt.Errorf("baca path %s: %w", root, err)
