@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/nersus15/webcore-go-cli/internal/gomod"
 	"github.com/nersus15/webcore-go-cli/internal/names"
@@ -48,6 +49,14 @@ func NewModule(name, modulePathOverride string, force bool) error {
 		}
 		if err := runIn(base, "go", "mod", "init", modulePathOverride); err != nil {
 			return fmt.Errorf("go mod init di %s: %w", base, err)
+		}
+		// "go mod init" memakai versi toolchain lokal secara default —
+		// kalau ada go.work yang mendeklarasikan versi lain, samakan,
+		// supaya tidak muncul "requires go >= X tapi go.work lists Y".
+		if wantVersion, ok := gomod.WorkspaceGoVersion(base); ok {
+			if err := setGoModVersion(base, wantVersion); err != nil {
+				return fmt.Errorf("samakan versi go di %s/go.mod: %w", base, err)
+			}
 		}
 	} else {
 		modulePath, err := gomod.DetectModulePath()
@@ -117,6 +126,26 @@ sama (mis. "database:postgres": &postgres.PostgresLoader{}).
 	}
 
 	return nil
+}
+
+// setGoModVersion mengganti baris "go X.Y.Z" di <dir>/go.mod.
+func setGoModVersion(dir, version string) error {
+	modPath := filepath.Join(dir, "go.mod")
+	content, err := os.ReadFile(modPath)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "go ") {
+			lines[i] = "go " + version
+			break
+		}
+	}
+
+	return os.WriteFile(modPath, []byte(strings.Join(lines, "\n")), 0o644)
 }
 
 const moduleGoTmpl = `package {{.Pkg}}

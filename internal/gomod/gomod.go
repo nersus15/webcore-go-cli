@@ -85,3 +85,37 @@ func ModulePathAt(dir string) (path string, ok bool) {
 
 	return "", false
 }
+
+// WorkspaceGoVersion mencari go.work mulai dari dir naik ke direktori
+// induk, dan mengembalikan versi Go yang dideklarasikannya (baris "go
+// X.Y.Z"). Dipakai supaya go.mod baru yang dibuat "go mod init" untuk
+// module standalone (--module-path) ikut versi go.work, bukan versi
+// default toolchain lokal — kalau tidak disamakan, "go build" di
+// workspace itu akan menolak dengan "requires go >= X tapi go.work
+// lists Y". ok bernilai false kalau tidak ada go.work ditemukan.
+func WorkspaceGoVersion(dir string) (version string, ok bool) {
+	d, err := filepath.Abs(dir)
+	if err != nil {
+		return "", false
+	}
+
+	for {
+		content, err := os.ReadFile(filepath.Join(d, "go.work"))
+		if err == nil {
+			scanner := bufio.NewScanner(strings.NewReader(string(content)))
+			for scanner.Scan() {
+				line := strings.TrimSpace(scanner.Text())
+				if strings.HasPrefix(line, "go ") {
+					return strings.TrimSpace(strings.TrimPrefix(line, "go")), true
+				}
+			}
+			return "", false
+		}
+
+		parent := filepath.Dir(d)
+		if parent == d {
+			return "", false
+		}
+		d = parent
+	}
+}
