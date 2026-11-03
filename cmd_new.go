@@ -15,6 +15,11 @@ func newCmd() *cobra.Command {
 		Short: "Buat project webcore baru",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Args sudah divalidasi Cobra di titik ini — error dari sini
+			// ke bawah adalah error bisnis (folder sudah ada, dll.), bukan
+			// soal cara pakai, jadi usage block tidak perlu ditampilkan.
+			cmd.SilenceUsage = true
+
 			return scaffold.NewProject(scaffold.NewProjectOptions{
 				Dir:        args[0],
 				ModulePath: modulePath,

@@ -43,6 +43,7 @@ func makeModuleCmd() *cobra.Command {
 		Short: "Modul lengkap: module.go + config/entity/repository/service/handler",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true // error dari sini adalah error bisnis, bukan soal cara pakai
 			modulePath, err := gomod.DetectModulePath()
 			if err != nil {
 				return err
@@ -69,6 +70,7 @@ func makeStandaloneCmd(noun, short string, fn standaloneFn) *cobra.Command {
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			modulePath, err := gomod.DetectModulePath()
 			if err != nil {
 				return err
@@ -92,6 +94,7 @@ func makeHelperCmd() *cobra.Command {
 		Short: "Buat package helper mandiri di helper/",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			return scaffold.NewHelper(args[0], force)
 		},
 	}
@@ -108,6 +111,7 @@ func makeLibraryCmd() *cobra.Command {
 		Short: "Buat skeleton library kustom (port.Library/Connector/LibraryLoader)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			return scaffold.NewLibrary(args[0], force)
 		},
 	}
@@ -125,6 +129,7 @@ func makeMigrationCmd() *cobra.Command {
 		Short: "Buat file migrasi goose (NNNNN_nama.sql, auto-increment)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
 			return scaffold.NewMigration(args[0], module, force)
 		},
 	}

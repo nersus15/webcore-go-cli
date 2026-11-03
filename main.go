@@ -3,17 +3,21 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 )
 
 func main() {
+	// SilenceUsage TIDAK di-set di sini (biarkan default false): kalau
+	// di-set true di root, itu menjalar ke SEMUA subcommand dan mematikan
+	// usage block untuk kasus di mana usage justru membantu, mis. argumen
+	// kurang/invalid di "make service". Error dari logic bisnis (bukan
+	// argumen) disilent per-RunE lewat cmd.SilenceUsage = true, lihat
+	// cmd_new.go/cmd_make.go.
 	rootCmd := &cobra.Command{
-		Use:          "webcore-cli",
-		Short:        "CLI scaffolding untuk framework WebCore",
-		SilenceUsage: true,
+		Use:   "webcore-cli",
+		Short: "CLI scaffolding untuk framework WebCore",
 	}
 
 	rootCmd.AddCommand(
@@ -21,8 +25,9 @@ func main() {
 		makeCmd(),
 	)
 
+	// Tidak perlu print err di sini — Cobra sudah mencetak error (dan
+	// usage block kalau relevan) sebelum Execute() mengembalikan err.
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
