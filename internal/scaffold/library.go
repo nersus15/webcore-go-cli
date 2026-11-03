@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/webcore-go/webcore-cli/internal/names"
+	"github.com/nersus15/webcore-cli/internal/names"
 )
 
 // LibraryData adalah variabel template untuk make:library.
