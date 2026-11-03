@@ -42,6 +42,7 @@ Jalankan `webcore-go-cli --help` untuk daftar lengkap. Ringkasan:
 | `make helper <Nama>` | Package helper mandiri |
 | `make library <Nama>` | Skeleton library kustom (`port.Library`/`Connector`/`LibraryLoader`) |
 | `make migration <nama>` | File migrasi goose (`NNNNN_nama.sql`, auto-increment) |
+| `rename-module <path-baru>` | Ganti module path (go.mod) + perbaiki semua import ke path lama, termasuk di module lain dalam go.work yang sama |
 
 Semua subcommand `make` (kecuali `new`) membaca module path dari `go.mod` project — dicari mulai dari direktori kerja saat ini, naik ke direktori induk kalau perlu (jadi tetap jalan dipanggil dari subfolder).
 
@@ -75,6 +76,25 @@ Kalau project Anda memakai [go.work](https://go.dev/ref/mod#workspaces) dengan t
 - **`make config/entity/repository/service/handler <Nama> --module=<nama>`** — kalau `modules/<nama>/` sudah punya `go.mod` sendiri, CLI otomatis membaca module path ASLI dari situ (tidak pernah menebak dari nama direktori). Tidak perlu flag tambahan apa pun — perilakunya otomatis berbeda dari mode nested klasik begitu `go.mod` terdeteksi.
 
 Kalau dijalankan dari root project (ada `go.work`, tidak ada `go.mod` di situ) tanpa `--module-path` atau `--module` yang sesuai, CLI akan menolak dengan pesan error yang menjelaskan opsi mana yang harus dipakai — bukan asal tebak.
+
+### Mengganti module path (`rename-module`)
+
+Butuh ganti module path setelah project sudah berjalan (mis. salah nama waktu `go mod init`, atau pindah org)? `rename-module`:
+
+1. Mengganti baris `module` di `go.mod` target.
+2. Mencari & memperbaiki semua import ke path lama — di dalam module itu sendiri, **dan** di module lain dalam workspace `go.work` yang sama yang memakainya sebagai dependency (pemanggil lintas-modul).
+3. Menjalankan `go mod tidy` di tiap module yang tersentuh.
+
+```bash
+webcore-go-cli rename-module github.com/acme/my-api-v2        # target: go.mod root project
+webcore-go-cli rename-module github.com/acme/mod-orders --module=orders  # target: modules/orders/go.mod
+
+webcore-go-cli rename-module github.com/acme/my-api-v2 --dry-run  # lihat dulu file apa saja yang akan kesentuh
+```
+
+`--module=<nama>` cuma berlaku untuk modul yang sudah punya `go.mod` sendiri (dibuat lewat `make module --module-path=...`) — bukan modul klasik yang dinestkan di bawah go.mod root.
+
+Tidak menjangkau repo/module di luar workspace `go.work` saat ini — perbaiki manual kalau ada project lain (di luar workspace ini) yang juga meng-import module yang di-rename.
 
 ## Contoh Alur Penuh
 

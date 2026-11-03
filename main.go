@@ -23,6 +23,7 @@ func main() {
 	rootCmd.AddCommand(
 		newCmd(),
 		makeCmd(),
+		renameModuleCmd(),
 	)
 
 	// Tidak perlu print err di sini — Cobra sudah mencetak error (dan
