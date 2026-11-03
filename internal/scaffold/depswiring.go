@@ -111,16 +111,37 @@ Tambahkan manual:
         libraries = %s.APP_LIBRARIES
         packages = %s.APP_PACKAGES
 `, mainGoPath, err, importPath, pkg, pkg, pkg, pkg, pkg)
-		return nil
-	}
-
-	fmt.Printf("  updated: %s\n", mainGoPath)
-	fmt.Printf(`
+	} else {
+		fmt.Printf("  updated: %s\n", mainGoPath)
+		fmt.Printf(`
 Jangan lupa tambahkan "./modules/%s" ke blok use() di go.work, lalu:
   cd %s && go mod tidy
 `, pkg, root)
+	}
+
+	if err := generateDevEnvFor(pkg, absRoot, force); err != nil {
+		fmt.Printf("\nperingatan: tidak bisa generate .env-%s/air-%s.toml (%v)\n", pkg, pkg, err)
+	}
 
 	return nil
+}
+
+// generateDevEnvFor membungkus GenerateDevEnv: menghitung mainDir relatif
+// ke cwd (dibutuhkan air-<pkg>.toml-nya, sebab air.toml konvensinya ditaruh
+// di root workspace, SEJAJAR dengan go.work — lihat contoh air.toml/
+// air-<service>.toml nyata).
+func generateDevEnvFor(pkg, absMainDir string, force bool) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	mainDirRel, err := filepath.Rel(cwd, absMainDir)
+	if err != nil {
+		return err
+	}
+
+	return GenerateDevEnv(pkg, mainDirRel, force)
 }
 
 const depsLibrariesTmpl = `package {{.Pkg}}

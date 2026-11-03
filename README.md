@@ -43,6 +43,7 @@ Jalankan `webcore-go-cli --help` untuk daftar lengkap. Ringkasan:
 | `make library <Nama>` | Skeleton library kustom (`port.Library`/`Connector`/`LibraryLoader`) |
 | `make migration <nama>` | File migrasi goose (`NNNNN_nama.sql`, auto-increment) |
 | `rename-module <path-baru>` | Ganti module path (go.mod) + perbaiki semua import ke path lama, termasuk di module lain dalam go.work yang sama |
+| `run <module>` | Jalankan `air -c air-<module>.toml` (dev, hot-reload) — error kalau filenya belum ada |
 
 Semua subcommand `make` (kecuali `new`) membaca module path dari `go.mod` project — dicari mulai dari direktori kerja saat ini, naik ke direktori induk kalau perlu (jadi tetap jalan dipanggil dari subfolder).
 
@@ -93,10 +94,28 @@ Ini akan:
 
 1. Generate `app/satusehat/libraries.go` dan `app/satusehat/packages.go` (file baru, selalu aman).
 2. **Coba** mengedit `app/main.go` secara otomatis lewat AST Go (bukan regex) — menambahkan import, entry `"satusehat": true` ke map `validServices`-nya, dan `case "satusehat":` ke switch dispatch-nya, tepat sebelum `default:`. Hasilnya diverifikasi lewat `go/format` sebelum ditulis.
+3. Generate `.env-satusehat` (checklist semua env var config webcore, SEMUA ter-comment dengan contoh default value-nya — lihat bagian selanjutnya) dan `air-satusehat.toml` (siap pakai lewat `webcore-go-cli run satusehat`).
 
-Langkah 2 **best-effort**: kalau polanya (map `map[string]bool` atau switch `switch x { case "a": ... default: }`) tidak ketemu atau ambigu (lebih dari satu kandidat) di `main.go`, CLI tidak menebak — cukup mencetak snippet yang harus ditambahkan manual. Nama folder `<deps-dir>` bebas (`deps`, `app`, dll.) — bukan konvensi yang di-hardcode.
+Langkah 2 **best-effort**: kalau polanya (map `map[string]bool` atau switch `switch x { case "a": ... default: }`) tidak ketemu atau ambigu (lebih dari satu kandidat) di `main.go`, CLI tidak menebak — cukup mencetak snippet yang harus ditambahkan manual. Nama folder `<deps-dir>` bebas (`deps`, `app`, dll.) — bukan konvensi yang di-hardcode. `air-<nama>.toml`/`.env-<nama>` selalu ditaruh di direktori kerja saat ini (root workspace), bukan di dalam `<deps-dir>` — mengikuti konvensi `air.toml` yang biasanya sejajar dengan `go.work`.
 
-Diverifikasi terhadap project `go.work` multi-service nyata (composition root dengan `validServices` map + switch per-service + override port) — hasil edit `main.go` tetap `go build` bersih, komentar dan kode lain yang sudah ada tidak terganggu.
+Diverifikasi terhadap project `go.work` multi-service nyata (composition root dengan `validServices` map + switch per-service + override port) — hasil edit `main.go` tetap `go build` bersih, komentar dan kode lain yang sudah ada tidak terganggu, dan hasil `air-<nama>.toml`-nya benar-benar bisa dijalankan sampai binary start.
+
+### Checklist env var (`.env-<module>`)
+
+Daftar env var di `.env-<module>` diambil dari tabel statis yang disalin dari `infra/config/binding.go` + `infra/config/defaults.go` webcore (termasuk field yang belum terpublish ke proxy publik) — **bukan** di-parse dari `config.yaml`/`config.yaml.example` project Anda, supaya hasilnya konsisten di project mana pun terlepas dari isi file config yang kebetulan ada. Semua baris sengaja di-comment; nilai di sebelah kanan adalah default bawaan webcore, bukan nilai aktif — uncomment & sesuaikan yang relevan saja, mis.:
+
+```bash
+# .env-satusehat
+AUTH_TYPE=none
+```
+
+### Menjalankan dev (`run`)
+
+```bash
+webcore-go-cli run satusehat
+```
+
+Sama dengan `air -c air-satusehat.toml` — error jelas kalau file itu belum ada (generate dulu lewat `make module ... --deps-dir=...`). Binary `air` dicari lewat `PATH` dulu, lalu fallback ke `~/air` — banyak setup nge-alias `air` ke binary yang didownload manual ke home directory, dan alias shell semacam itu tidak pernah ter-resolve lewat pencarian `PATH` biasa (`exec.Command` tidak lewat shell, jadi alias tidak berlaku).
 
 ### Mengganti module path (`rename-module`)
 

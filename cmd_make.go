@@ -67,9 +67,9 @@ func makeModuleCmd() *cobra.Command {
 			"(go mod init dijalankan otomatis) — dipakai di project multi-module/go.work, "+
 			"di mana nama direktori boleh berbeda dari import path")
 	cmd.Flags().StringVar(&depsDir, "deps-dir", "",
-		"generate <deps-dir>/<nama>/{libraries,packages}.go dan coba sisipkan wiring-nya "+
-			"ke <deps-dir>/main.go (pola composition-root per-service) — butuh --module-path, "+
-			"nama foldernya bebas (mis. \"deps\", \"app\")")
+		"generate <deps-dir>/<nama>/{libraries,packages}.go, coba sisipkan wiring-nya ke "+
+			"<deps-dir>/main.go, dan generate .env-<nama> + air-<nama>.toml untuk dev "+
+			"(pola composition-root per-service) — butuh --module-path")
 	return cmd
 }
 

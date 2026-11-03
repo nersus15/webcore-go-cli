@@ -24,6 +24,7 @@ func main() {
 		newCmd(),
 		makeCmd(),
 		renameModuleCmd(),
+		runCmd(),
 	)
 
 	// Tidak perlu print err di sini — Cobra sudah mencetak error (dan
