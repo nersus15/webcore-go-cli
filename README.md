@@ -43,7 +43,7 @@ Jalankan `webcore-go-cli --help` untuk daftar lengkap. Ringkasan:
 | `make library <Nama>` | Skeleton library kustom (`port.Library`/`Connector`/`LibraryLoader`) |
 | `make migration <nama>` | File migrasi goose (`NNNNN_nama.sql`, auto-increment) |
 
-Semua subcommand `make` (kecuali `new`) membaca module path dari `go.mod` di direktori kerja saat ini — jalankan dari root project.
+Semua subcommand `make` (kecuali `new`) membaca module path dari `go.mod` project — dicari mulai dari direktori kerja saat ini, naik ke direktori induk kalau perlu (jadi tetap jalan dipanggil dari subfolder).
 
 > Subcommand `make` sengaja pakai spasi (`make module`), bukan titik dua (`make:module`) — titik dua ada di `COMP_WORDBREAKS` default bash, dan akan membuat completion tab tidak ter-insert dengan benar.
 
@@ -61,6 +61,20 @@ webcore-go-cli make module Orders
 webcore-go-cli make entity OrderItem --module=orders
 webcore-go-cli make entity OrderItem --module=orders --force   # timpa kalau sudah ada
 ```
+
+### Project multi-module (go.work)
+
+Kalau project Anda memakai [go.work](https://go.dev/ref/mod#workspaces) dengan tiap modul punya `go.mod` sendiri (lihat [workspace.md](https://github.com/webcore-go/webcore) § Proyek Multi-Modul) — tidak ada satu `go.mod` yang menaungi seluruh repo, jadi perlu sedikit berbeda:
+
+- **`make module <Nama> --module-path=<path>`** — buat modul baru yang berdiri sendiri (jalankan `go mod init <path>` otomatis di `modules/<nama>/`). `<path>` bisa berbeda total dari nama direktorinya — nama direktori cuma label folder, bukan sumber import path.
+
+  ```bash
+  webcore-go-cli make module satusehat --module-path=github.com/acme/mod-satusehat
+  ```
+
+- **`make config/entity/repository/service/handler <Nama> --module=<nama>`** — kalau `modules/<nama>/` sudah punya `go.mod` sendiri, CLI otomatis membaca module path ASLI dari situ (tidak pernah menebak dari nama direktori). Tidak perlu flag tambahan apa pun — perilakunya otomatis berbeda dari mode nested klasik begitu `go.mod` terdeteksi.
+
+Kalau dijalankan dari root project (ada `go.work`, tidak ada `go.mod` di situ) tanpa `--module-path` atau `--module` yang sesuai, CLI akan menolak dengan pesan error yang menjelaskan opsi mana yang harus dipakai — bukan asal tebak.
 
 ## Contoh Alur Penuh
 
